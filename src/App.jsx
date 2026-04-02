@@ -68,8 +68,11 @@ const PRIOR_COHORTS = ["INS25", "INS24", "INS23", "INS21"];
 /** The current active cohort - gets special treatment (slider, snapshots, daily clearance) */
 const CURRENT_COHORT = "INS26";
 
-/** Maximum number of days to compute for the melt overlay (x-axis limit) */
-const MAX_DAY = 60;
+/** Maximum number of days to compute for the melt overlay */
+const MAX_DAY = 180;
+
+/** Day range presets for the melt chart x-axis zoom */
+const DAY_RANGE_OPTIONS = [15, 30, 60, 90, 120, 180];
 
 /** Color assigned to each cohort line in the melt overlay */
 const COHORT_COLORS = {
@@ -660,6 +663,8 @@ export default function HoldMeltDashboard() {
   );
   const [playing, setPlaying] = useState(false);              // Is Play Melt animation running?
   const [settingsOpen, setSettingsOpen] = useState(false);    // Settings panel visibility
+  const [dayRange, setDayRange] = useState(60);               // Melt chart x-axis range (days)
+  const [showResolution, setShowResolution] = useState(false); // Show "last clearance" lines on melt chart
   const [settings, setSettings] = useState({                  // User-adjustable settings
     fontSize: "md",  // sm | md | lg
     delay: 1,        // Hold release delay in days
@@ -708,6 +713,24 @@ export default function HoldMeltDashboard() {
     return avg;
   }, [cohorts, enabledCohorts]);
 
+  // ── Resolution days (last clearance day per cohort) ──
+  // For each cohort, finds the last day any hold was cleared (the curve stopped
+  // decreasing). Used for the optional "last clearance" reference lines.
+  // Cohorts with holds still clearing return null.
+  const resolutionDays = useMemo(() => {
+    const result = {};
+    for (const code of COHORT_ORDER) {
+      const curve = cohorts[code]?.curve;
+      if (!curve || curve.length < 2) { result[code] = null; continue; }
+      let lastDrop = null;
+      for (let i = 1; i < curve.length; i++) {
+        if (curve[i].remaining < curve[i - 1].remaining) lastDrop = curve[i].day;
+      }
+      result[code] = lastDrop;
+    }
+    return result;
+  }, [cohorts]);
+
   // ── Current cohort snapshot data ──
   const curCohort = cohorts[CURRENT_COHORT];
   const maxSlider = curCohort ? curCohort.endDay : 0;
@@ -745,6 +768,11 @@ export default function HoldMeltDashboard() {
     }
     return out;
   }, [showPct, cohorts, priorAvg]);
+
+  // Filter overlay data to the selected day range for rendering
+  const visibleOverlayData = useMemo(() =>
+    overlayData.filter(d => d.day <= dayRange),
+  [overlayData, dayRange]);
 
   // Snapshot: formatted dates with class breakdown for stacked charts
   const snapChartData = useMemo(() =>
@@ -963,6 +991,14 @@ export default function HoldMeltDashboard() {
                   cursor: "pointer", fontSize: s(12), fontWeight: 500,
                 }}>{showAvg ? "▣" : "▢"} Prior Avg</button>
               )}
+              {/* Resolution lines toggle */}
+              <button onClick={() => setShowResolution(!showResolution)} style={{
+                padding: "5px 12px", borderRadius: 6,
+                border: `1px solid ${showResolution ? theme.accent + "60" : theme.border}`,
+                background: showResolution ? `${theme.accent}15` : "transparent",
+                color: showResolution ? theme.text : theme.textDim,
+                cursor: "pointer", fontSize: s(12), fontWeight: 500,
+              }}>{showResolution ? "▣" : "▢"} Last Clear</button>
               {/* Percentage / Absolute count toggle */}
               <Pill
                 options={[{ val: true, label: "%" }, { val: false, label: "#" }]}
@@ -972,7 +1008,7 @@ export default function HoldMeltDashboard() {
           </div>
 
           {/* Cohort toggle pills */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
             {COHORT_ORDER.map(code => cohorts[code] ? (
               <CohortToggle key={code} code={code}
                 enabled={enabledCohorts[code]} onToggle={toggleCohort}
@@ -981,9 +1017,17 @@ export default function HoldMeltDashboard() {
             ) : null)}
           </div>
 
+          {/* Day range pills */}
+          <div style={{ display: "flex", gap: 3, marginBottom: 16, flexWrap: "wrap" }}>
+            <Pill
+              options={DAY_RANGE_OPTIONS.map(d => ({ val: d, label: `${d}d` }))}
+              value={dayRange} onChange={setDayRange} theme={theme} fs={fs}
+            />
+          </div>
+
           {/* Melt overlay chart */}
           <ResponsiveContainer width="100%" height={380}>
-            <ComposedChart data={overlayData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+            <ComposedChart data={visibleOverlayData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
               <CartesianGrid {...gridProps} />
               <XAxis dataKey="day" {...xAxisProps} fontSize={s(11)}
                 label={{ value: "Days since hold placement", position: "insideBottom", offset: -2, fontSize: s(11), fill: theme.textMuted }}
@@ -1023,6 +1067,22 @@ export default function HoldMeltDashboard() {
                   strokeDasharray="2 6" strokeOpacity={0.35}
                 />
               )}
+
+              {/* Last clearance lines (dashed vertical per cohort) */}
+              {showResolution && COHORT_ORDER.map(code => {
+                const rd = resolutionDays[code];
+                if (!rd || !enabledCohorts[code] || rd > dayRange) return null;
+                return (
+                  <ReferenceLine key={`res-${code}`} x={rd}
+                    stroke={COHORT_COLORS[code]}
+                    strokeDasharray="3 6" strokeOpacity={0.5} strokeWidth={1.5}
+                    label={{
+                      value: `${YEAR_LABELS[code] || code}: ${rd}d`,
+                      position: "top", fontSize: 10, fill: COHORT_COLORS[code],
+                    }}
+                  />
+                );
+              })}
 
               {/* Individual cohort lines (rendered bottom-to-top so current is on top) */}
               {COHORT_ORDER.slice().reverse().map(code =>
