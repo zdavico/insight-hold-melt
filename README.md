@@ -18,6 +18,8 @@ Every semester, the InSight program places PERC registration holds on students w
 
 - **Hold Snapshot** - Time slider that scrubs through the current year day by day, showing a stacked area (or bar) chart of remaining holds by class standing (First Year, Sophomore, Junior). The "Play Melt" button animates the full sequence.
 
+- **Hold Recurrence** - Shows how many current-year students are first-time vs repeat hold recipients, segmented by total hold count (1st / 2nd / 3rd hold) rather than class standing (since class is credit-based and doesn't reliably reflect years enrolled). Includes clearance rates per group.
+
 ### Features
 
 - **Dark / Light mode** (dark default, Champlain Colors theme)
@@ -34,23 +36,25 @@ Every semester, the InSight program places PERC registration holds on students w
 ```
 insight-hold-melt/
 ├── README.md                 # This file
+├── .gitignore                # Excludes .salt and data/*.csv
+├── .salt                     # Salt secret for hashing student IDs (git-ignored)
 ├── package.json              # Dependencies and scripts
 ├── vite.config.js            # Vite build config
 ├── index.html                # HTML entry point
 │
-├── data/                     # ← Drop your CSV exports here
-│   └── *.csv                 # PERC Hold Tags export from the student system
+├── data/                     # ← Drop your CSV exports here (git-ignored)
+│   └── *.csv                 # PERC Hold Tags export from Informer
 │
 ├── scripts/
-│   └── build-data.py         # CSV → JSON pipeline
+│   └── build-data.py         # CSV → JSON pipeline (hashes student IDs)
 │
 ├── src/
 │   ├── main.jsx              # React entry point
 │   ├── App.jsx               # Main dashboard component (all logic + UI)
 │   └── data/
-│       └── holds.json        # Pipeline output (generated, not hand-edited)
+│       └── holds.json        # Pipeline output (hashed IDs, safe to commit)
 │
-└── public/                   # Static assets (currently empty)
+└── public/                   # Static assets
 ```
 
 ---
@@ -84,16 +88,34 @@ python3 scripts/build-data.py
 
 The pipeline will:
 1. Find the most recent CSV in `data/`
-2. Filter to INS-prefixed restrictions only
-3. Exclude Senior (SR) and Alumni (ALUM) records
-4. Output clean JSON to `src/data/holds.json`
-5. Print a summary of processed records
+2. Read the salt from `.salt` for student ID hashing
+3. Filter to INS-prefixed restrictions only
+4. Include all class standings (FY, SO, JR, SR, ALUM) for accurate melt curves
+5. Hash student IDs with a salted SHA-256 (8-character hex) for recurrence tracking
+6. Output clean JSON to `src/data/holds.json`
+7. Print a summary of processed records and recurrence stats
 
-**To update the dashboard with fresh data**, just drop a new CSV in `data/` and re-run the pipeline. Then restart the dev server (or rebuild).
+**To update the dashboard with fresh data:**
+
+```bash
+# 1. Drop new CSV in data/
+# 2. Rebuild the JSON
+npm run build-data
+# 3. Commit and push
+git add .
+git commit -m "Update hold data"
+git push
+# 4. Deploy to GitHub Pages
+npm run deploy
+```
 
 ### Future: Wildcard Export
 
-The pipeline is designed to be forward-compatible with a wildcard PERC export (all students, all restriction types). The filters in `build-data.py` are clearly marked. When you switch to the wildcard export, you'll adjust the filters and potentially add a "cohort penetration" view showing what percentage of each class standing received a hold.
+The pipeline is designed to be forward-compatible with a wildcard PERC export (all students, all restriction types). The filters in `build-data.py` are clearly marked. When you switch to the wildcard export, you'll adjust the filters and potentially add a "cohort penetration" view showing what percentage of each class received a hold.
+
+### Class Standing Note
+
+The `Class` column in the CSV reflects current class standing (based on credits), not standing at time of hold placement. For prior years, students may show as SR or ALUM even though they were FY/SO/JR when the hold was placed. The dashboard handles this by including all class standings in melt curves (for accurate totals) and only using the FY/SO/JR breakdown for the current cohort's snapshot and daily clearance views, where the data is accurate. Hold recurrence is tracked by student ID hash, not class standing, since class is credit-based and doesn't reliably reflect years enrolled.
 
 ---
 
@@ -107,7 +129,27 @@ You can adjust this in the Settings panel (gear icon in the header). Changing th
 
 ---
 
-## Local Development Setup
+## Privacy and FERPA Compliance
+
+Hold records contain FERPA-protected educational data. The pipeline protects student identity through salted hashing:
+
+- **Student IDs are never stored in the output JSON.** The pipeline reads the raw ID from the CSV, combines it with a secret salt phrase, and writes an 8-character SHA-256 hash (e.g., `2f7b3ddc`). The hash is consistent across records, so the dashboard can track recurrence, but it cannot be reversed to recover the original ID.
+
+- **The salt is stored in `.salt`** in the project root. This file is git-ignored and never leaves your machine. Without the salt, brute-forcing the hashes is infeasible.
+
+- **Raw CSVs are git-ignored** via `data/*.csv` in `.gitignore`. They stay on your machine only.
+
+- **The generated `holds.json` is safe to commit** and deploy publicly. It contains only hashed IDs, dates, restriction codes, and class standings.
+
+### First-Time Setup
+
+Create a `.salt` file in the project root containing your secret phrase (no quotes, no newline):
+
+```bash
+echo -n "your-secret-phrase" > .salt
+```
+
+If you regenerate the salt, all hashes will change. The dashboard still works, but you lose the ability to compare old and new JSON exports by hash.
 
 ### Prerequisites
 
@@ -138,7 +180,17 @@ The dev server opens at `http://localhost:5173` with hot reload.
 npm run build
 ```
 
-Output goes to the `dist/` folder. This can be deployed to GitHub Pages or any static host.
+Output goes to the `dist/` folder.
+
+### Deploy to GitHub Pages
+
+```bash
+npm run deploy
+```
+
+This runs `npm run build` automatically (via `predeploy`), then pushes the `dist/` folder to the `gh-pages` branch. GitHub Pages serves from that branch.
+
+The dashboard is live at `https://zdavico.github.io/insight-hold-melt/`.
 
 ---
 
@@ -178,7 +230,7 @@ When a new hold cycle begins (e.g., INS27 for 2026-27):
    - `COHORT_COLORS` object (pick a new color)
    - Update `CURRENT_COHORT` to the new code
 3. Run the pipeline with a CSV that includes the new restriction code
-4. The dashboard handles everything else automatically
+4. The dashboard handles everything else automatically (melt curves, daily clearance, snapshot, and recurrence all adapt to the new current cohort)
 
 ---
 
