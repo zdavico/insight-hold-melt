@@ -664,7 +664,6 @@ export default function HoldMeltDashboard() {
   const [playing, setPlaying] = useState(false);              // Is Play Melt animation running?
   const [settingsOpen, setSettingsOpen] = useState(false);    // Settings panel visibility
   const [dayRange, setDayRange] = useState(60);               // Melt chart x-axis range (days)
-  const [showResolution, setShowResolution] = useState(false); // Show "last clearance" lines on melt chart
   const [settings, setSettings] = useState({                  // User-adjustable settings
     fontSize: "md",  // sm | md | lg
     delay: 1,        // Hold release delay in days
@@ -712,24 +711,6 @@ export default function HoldMeltDashboard() {
     }
     return avg;
   }, [cohorts, enabledCohorts]);
-
-  // ── Resolution days (last clearance day per cohort) ──
-  // For each cohort, finds the last day any hold was cleared (the curve stopped
-  // decreasing). Used for the optional "last clearance" reference lines.
-  // Cohorts with holds still clearing return null.
-  const resolutionDays = useMemo(() => {
-    const result = {};
-    for (const code of COHORT_ORDER) {
-      const curve = cohorts[code]?.curve;
-      if (!curve || curve.length < 2) { result[code] = null; continue; }
-      let lastDrop = null;
-      for (let i = 1; i < curve.length; i++) {
-        if (curve[i].remaining < curve[i - 1].remaining) lastDrop = curve[i].day;
-      }
-      result[code] = lastDrop;
-    }
-    return result;
-  }, [cohorts]);
 
   // ── Current cohort snapshot data ──
   const curCohort = cohorts[CURRENT_COHORT];
@@ -935,7 +916,7 @@ export default function HoldMeltDashboard() {
         </div>
       </div>
 
-      <div style={{ padding: "24px 28px", maxWidth: 1200, margin: "0 auto" }}>
+      <div style={{ padding: "24px 28px" }}>
 
         {/* ═══ SUMMARY CARDS ═══ */}
         {/* Four key metrics for the current cohort, updated by the slider position */}
@@ -991,14 +972,6 @@ export default function HoldMeltDashboard() {
                   cursor: "pointer", fontSize: s(12), fontWeight: 500,
                 }}>{showAvg ? "▣" : "▢"} Prior Avg</button>
               )}
-              {/* Resolution lines toggle */}
-              <button onClick={() => setShowResolution(!showResolution)} style={{
-                padding: "5px 12px", borderRadius: 6,
-                border: `1px solid ${showResolution ? theme.accent + "60" : theme.border}`,
-                background: showResolution ? `${theme.accent}15` : "transparent",
-                color: showResolution ? theme.text : theme.textDim,
-                cursor: "pointer", fontSize: s(12), fontWeight: 500,
-              }}>{showResolution ? "▣" : "▢"} Last Clear</button>
               {/* Percentage / Absolute count toggle */}
               <Pill
                 options={[{ val: true, label: "%" }, { val: false, label: "#" }]}
@@ -1067,22 +1040,6 @@ export default function HoldMeltDashboard() {
                   strokeDasharray="2 6" strokeOpacity={0.35}
                 />
               )}
-
-              {/* Last clearance lines (dashed vertical per cohort) */}
-              {showResolution && COHORT_ORDER.map(code => {
-                const rd = resolutionDays[code];
-                if (!rd || !enabledCohorts[code] || rd > dayRange) return null;
-                return (
-                  <ReferenceLine key={`res-${code}`} x={rd}
-                    stroke={COHORT_COLORS[code]}
-                    strokeDasharray="3 6" strokeOpacity={0.5} strokeWidth={1.5}
-                    label={{
-                      value: `${YEAR_LABELS[code] || code}: ${rd}d`,
-                      position: "top", fontSize: 10, fill: COHORT_COLORS[code],
-                    }}
-                  />
-                );
-              })}
 
               {/* Individual cohort lines (rendered bottom-to-top so current is on top) */}
               {COHORT_ORDER.slice().reverse().map(code =>
