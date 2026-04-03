@@ -1076,7 +1076,8 @@ export default function HoldMeltDashboard() {
                   const d = c.daysTo50;
                   return (
                     <span key={code} style={{
-                      display: "flex", alignItems: "center", gap: 5,
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                      flex: "1 1 120px", minWidth: 120,
                       fontSize: s(12), fontWeight: 500, padding: "3px 10px", borderRadius: 6,
                       color: theme.text, background: `${COHORT_COLORS[code]}12`,
                       border: `1px solid ${COHORT_COLORS[code]}30`,
@@ -1109,7 +1110,8 @@ export default function HoldMeltDashboard() {
                   const d = c.daysTo25;
                   return (
                     <span key={code} style={{
-                      display: "flex", alignItems: "center", gap: 5,
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                      flex: "1 1 120px", minWidth: 120,
                       fontSize: s(12), fontWeight: 500, padding: "3px 10px", borderRadius: 6,
                       color: theme.text, background: `${COHORT_COLORS[code]}08`,
                       border: `1px solid ${COHORT_COLORS[code]}20`,
