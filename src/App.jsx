@@ -42,6 +42,9 @@ import {
 import holdsData from "./data/holds.json";
 const RAW_HOLDS = holdsData.holds;
 
+/** Program code -> full title lookup (loaded from config/deg_lut.csv via pipeline) */
+const PROGRAM_NAMES = holdsData.meta?.programNames || {};
+
 /**
  * Maps restriction codes to academic year display labels.
  * Add new entries here as new hold cycles begin.
@@ -1600,10 +1603,17 @@ export default function HoldMeltDashboard() {
                     background: idx % 2 === 0 ? "transparent" : theme.surfaceAlt + "40",
                   }}>
                     <td style={{
-                      padding: "7px 12px", fontWeight: 600, color: theme.text,
+                      padding: "7px 12px",
                       borderBottom: `1px solid ${theme.border}40`,
                     }}>
-                      {row.program}
+                      <div style={{ fontWeight: 600, color: theme.text }}>
+                        {PROGRAM_NAMES[row.program] || row.program}
+                      </div>
+                      {PROGRAM_NAMES[row.program] && (
+                        <div style={{ fontSize: s(10), color: theme.textDim, marginTop: 1 }}>
+                          {row.program}
+                        </div>
+                      )}
                     </td>
                     <td style={{
                       padding: "7px 12px", textAlign: "right", color: theme.textMuted,

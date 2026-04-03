@@ -32,8 +32,10 @@ from datetime import datetime
 # Where to look for the CSV (relative to project root)
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+CONFIG_DIR = os.path.join(PROJECT_ROOT, "config")
 OUTPUT_PATH = os.path.join(PROJECT_ROOT, "src", "data", "holds.json")
 SALT_PATH = os.path.join(PROJECT_ROOT, ".salt")
+DEG_LUT_PATH = os.path.join(CONFIG_DIR, "deg_lut.csv")
 
 # Filters (adjust these when switching to wildcard exports)
 RESTRICTION_PREFIX = "INS"          # Only include restrictions starting with this
@@ -71,6 +73,26 @@ def hash_id(student_id, salt):
     """Hash a student ID with the salt. Returns an 8-character hex string.
     8 hex chars = 4 billion possible values, more than enough for ~1700 students."""
     return hashlib.sha256((salt + student_id).encode()).hexdigest()[:8]
+
+
+def load_degree_lookup():
+    """Load the degree code -> title lookup from config/deg_lut.csv.
+    Returns a dict mapping program codes to full titles.
+    If the file doesn't exist, returns an empty dict (codes shown as-is)."""
+    if not os.path.exists(DEG_LUT_PATH):
+        print(f"  Note: No degree lookup found at {DEG_LUT_PATH}")
+        print(f"  Program codes will display as-is in the dashboard.")
+        return {}
+    lookup = {}
+    with open(DEG_LUT_PATH, "r", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            code = row["Primary Program"].strip()
+            title = row["Primary Program Title"].strip()
+            if code:
+                lookup[code] = title
+    print(f"  Loaded {len(lookup)} program names from deg_lut.csv")
+    return lookup
 
 
 def find_csv(data_dir):
@@ -187,7 +209,7 @@ def summarize(records):
         print(f"    {n} {label}: {hold_counts[n]} students ({hold_counts[n]/len(student_codes)*100:.1f}%)")
 
 
-def build_output(records, source_file):
+def build_output(records, source_file, program_names):
     """Build the output JSON structure."""
     return {
         "holds": records,
@@ -200,6 +222,7 @@ def build_output(records, source_file):
                 "excludedClasses": sorted(EXCLUDED_CLASSES),
             },
             "yearLabels": YEAR_LABELS,
+            "programNames": program_names,
         },
     }
 
@@ -209,6 +232,7 @@ def main():
     print("-" * 40)
 
     salt = load_salt()
+    deg_lookup = load_degree_lookup()
     csv_path = find_csv(DATA_DIR)
     records, skipped = parse_csv(csv_path, salt)
 
@@ -227,7 +251,7 @@ def main():
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
 
     # Write JSON
-    output = build_output(records, csv_path)
+    output = build_output(records, csv_path, deg_lookup)
     with open(OUTPUT_PATH, "w") as f:
         json.dump(output, f, separators=(",", ":"))
 
