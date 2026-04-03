@@ -96,7 +96,7 @@ def parse_csv(filepath, salt):
         reader = csv.DictReader(f)
 
         # Validate expected columns exist
-        expected = {"Str Student", "Restriction", "Start Date", "End Date", "Class"}
+        expected = {"Str Student", "Restriction", "Start Date", "End Date", "Class", "Active Programs"}
         if not expected.issubset(set(reader.fieldnames or [])):
             missing = expected - set(reader.fieldnames or [])
             print(f"ERROR: CSV missing expected columns: {missing}")
@@ -109,6 +109,7 @@ def parse_csv(filepath, salt):
             class_standing = row["Class"].strip().strip('"')
             start_date = row["Start Date"].strip().strip('"')
             end_date = row["End Date"].strip().strip('"')
+            program = row["Active Programs"].strip().strip('"')
 
             # ── Filters (modify these for wildcard support) ──
             if not restriction.startswith(RESTRICTION_PREFIX):
@@ -136,6 +137,7 @@ def parse_csv(filepath, salt):
                 "e": end_date or "",    # end date (hold lifted), empty = still active
                 "c": class_standing,    # class standing: FY, SO, JR, SR, ALUM
                 "i": hash_id(student_id, salt),  # salted hash of student ID
+                "p": program,           # active program (degree code)
             })
 
     return records, skipped

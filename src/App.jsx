@@ -800,6 +800,42 @@ export default function HoldMeltDashboard() {
     return { groups, total };
   }, []);  // RAW_HOLDS is a module-level constant, no deps needed
 
+  // ── Program breakdown for current cohort ──
+  // Aggregates hold/clearance counts by active program for the table view.
+  const [programSort, setProgramSort] = useState({ col: "remaining", dir: "desc" });
+
+  const programStats = useMemo(() => {
+    const currentHolds = RAW_HOLDS.filter(h => h.r === CURRENT_COHORT);
+    const byProg = {};
+    for (const h of currentHolds) {
+      const prog = h.p || "(none)";
+      if (!byProg[prog]) byProg[prog] = { program: prog, holds: 0, cleared: 0, FY: 0, SO: 0, JR: 0 };
+      byProg[prog].holds++;
+      if (h.e) byProg[prog].cleared++;
+      if (h.c === "FY") byProg[prog].FY++;
+      else if (h.c === "SO") byProg[prog].SO++;
+      else if (h.c === "JR") byProg[prog].JR++;
+    }
+    return Object.values(byProg).map(p => ({
+      ...p,
+      remaining: p.holds - p.cleared,
+      pctCleared: p.holds > 0 ? Math.round((p.cleared / p.holds) * 100) : 0,
+    }));
+  }, []);
+
+  const sortedProgramStats = useMemo(() => {
+    const sorted = [...programStats];
+    sorted.sort((a, b) => {
+      const av = a[programSort.col];
+      const bv = b[programSort.col];
+      if (typeof av === "string") {
+        return programSort.dir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av);
+      }
+      return programSort.dir === "asc" ? av - bv : bv - av;
+    });
+    return sorted;
+  }, [programStats, programSort]);
+
   // ── Play Melt animation ──
   // Steps the slider from current position to the latest day at 120ms intervals.
   // Supports play, pause, and resume.
@@ -1502,6 +1538,129 @@ export default function HoldMeltDashboard() {
                 </div>
               );
             })}
+          </div>
+        </div>
+
+        {/* ═══ CLEARANCE BY PROGRAM ═══ */}
+        {/* Sortable table showing hold/clearance stats per academic program.
+            Only includes current cohort data where program info is accurate. */}
+        <div style={{
+          background: theme.surface, border: `1px solid ${theme.border}`,
+          borderRadius: 12, padding: "20px 24px", marginTop: 24,
+        }}>
+          <div style={{ marginBottom: 16 }}>
+            <h2 style={{ fontSize: s(16), fontWeight: 700 }}>
+              Clearance by Program ({YEAR_LABELS[CURRENT_COHORT]})
+            </h2>
+            <p style={{ fontSize: s(12), color: theme.textMuted, marginTop: 2 }}>
+              {sortedProgramStats.length} programs · Click column headers to sort
+            </p>
+          </div>
+
+          <div style={{ overflowX: "auto" }}>
+            <table style={{
+              width: "100%", borderCollapse: "collapse", fontSize: s(13),
+            }}>
+              <thead>
+                <tr>
+                  {[
+                    { col: "program", label: "Program" },
+                    { col: "holds", label: "Holds" },
+                    { col: "cleared", label: "Cleared" },
+                    { col: "remaining", label: "Remaining" },
+                    { col: "pctCleared", label: "% Cleared" },
+                    { col: "FY", label: "FY" },
+                    { col: "SO", label: "SO" },
+                    { col: "JR", label: "JR" },
+                  ].map(({ col, label }) => {
+                    const isActive = programSort.col === col;
+                    return (
+                      <th key={col}
+                        onClick={() => setProgramSort(prev => ({
+                          col,
+                          dir: prev.col === col && prev.dir === "desc" ? "asc" : "desc",
+                        }))}
+                        style={{
+                          padding: "8px 12px", textAlign: col === "program" ? "left" : "right",
+                          borderBottom: `2px solid ${theme.border}`,
+                          color: isActive ? theme.accent : theme.textMuted,
+                          cursor: "pointer", userSelect: "none",
+                          fontSize: s(11), fontWeight: 600, textTransform: "uppercase",
+                          letterSpacing: "0.04em", whiteSpace: "nowrap",
+                        }}>
+                        {label} {isActive ? (programSort.dir === "desc" ? "↓" : "↑") : ""}
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {sortedProgramStats.map((row, idx) => (
+                  <tr key={row.program} style={{
+                    background: idx % 2 === 0 ? "transparent" : theme.surfaceAlt + "40",
+                  }}>
+                    <td style={{
+                      padding: "7px 12px", fontWeight: 600, color: theme.text,
+                      borderBottom: `1px solid ${theme.border}40`,
+                    }}>
+                      {row.program}
+                    </td>
+                    <td style={{
+                      padding: "7px 12px", textAlign: "right", color: theme.textMuted,
+                      borderBottom: `1px solid ${theme.border}40`,
+                      fontFamily: "'DM Mono',monospace",
+                    }}>{row.holds}</td>
+                    <td style={{
+                      padding: "7px 12px", textAlign: "right", color: theme.textMuted,
+                      borderBottom: `1px solid ${theme.border}40`,
+                      fontFamily: "'DM Mono',monospace",
+                    }}>{row.cleared}</td>
+                    <td style={{
+                      padding: "7px 12px", textAlign: "right", fontWeight: 600,
+                      color: row.remaining > 0 ? theme.accent : theme.textDim,
+                      borderBottom: `1px solid ${theme.border}40`,
+                      fontFamily: "'DM Mono',monospace",
+                    }}>{row.remaining}</td>
+                    <td style={{
+                      padding: "7px 12px", textAlign: "right",
+                      borderBottom: `1px solid ${theme.border}40`,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
+                        <div style={{
+                          width: 50, height: 6, borderRadius: 3, background: theme.surfaceAlt,
+                          overflow: "hidden",
+                        }}>
+                          <div style={{
+                            width: `${row.pctCleared}%`, height: "100%", borderRadius: 3,
+                            background: row.pctCleared === 100 ? "#6FCF97" : theme.accent,
+                          }} />
+                        </div>
+                        <span style={{
+                          fontFamily: "'DM Mono',monospace",
+                          color: row.pctCleared === 100 ? "#6FCF97" : theme.text,
+                          fontWeight: row.pctCleared === 100 ? 600 : 400,
+                        }}>{row.pctCleared}%</span>
+                      </div>
+                    </td>
+                    <td style={{
+                      padding: "7px 12px", textAlign: "right", color: theme.textDim,
+                      borderBottom: `1px solid ${theme.border}40`,
+                      fontFamily: "'DM Mono',monospace", fontSize: s(12),
+                    }}>{row.FY}</td>
+                    <td style={{
+                      padding: "7px 12px", textAlign: "right", color: theme.textDim,
+                      borderBottom: `1px solid ${theme.border}40`,
+                      fontFamily: "'DM Mono',monospace", fontSize: s(12),
+                    }}>{row.SO}</td>
+                    <td style={{
+                      padding: "7px 12px", textAlign: "right", color: theme.textDim,
+                      borderBottom: `1px solid ${theme.border}40`,
+                      fontFamily: "'DM Mono',monospace", fontSize: s(12),
+                    }}>{row.JR}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
