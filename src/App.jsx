@@ -1058,71 +1058,77 @@ export default function HoldMeltDashboard() {
 
           {/* Days-to-50% summary strip */}
           {/* Shows badges per cohort for days to reach 50% and 25% remaining.
-              Uses CSS grid so badges align vertically between the two rows. */}
+              Uses flex-wrap so badges reflow on narrow screens. */}
           <div style={{
-            display: "grid",
-            gridTemplateColumns: `auto repeat(${COHORT_ORDER.length}, 1fr)`,
-            gap: "8px 8px", marginTop: 14,
-            padding: "12px 16px", background: theme.surfaceAlt, borderRadius: 8,
-            alignItems: "center",
+            marginTop: 14, padding: "12px 16px",
+            background: theme.surfaceAlt, borderRadius: 8,
+            display: "flex", flexDirection: "column", gap: 10,
           }}>
             {/* Row 1: Days to 50% cleared */}
-            <span style={{ fontSize: s(12), fontWeight: 600, color: theme.textMuted }}>
-              Days to 50% cleared:
-            </span>
-            {COHORT_ORDER.map(code => {
-              const c = cohorts[code];
-              if (!c) return <span key={code} />;
-              const d = c.daysTo50;
-              return (
-                <span key={code} style={{
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                  fontSize: s(12), fontWeight: 500, padding: "3px 8px", borderRadius: 6,
-                  color: theme.text, background: `${COHORT_COLORS[code]}12`,
-                  border: `1px solid ${COHORT_COLORS[code]}30`, textAlign: "center",
-                }}>
-                  <span style={{
-                    width: 7, height: 7, borderRadius: "50%", background: COHORT_COLORS[code],
-                    flexShrink: 0,
-                  }} />
-                  {(YEAR_LABELS[code] || code)}:
-                  <span style={{
-                    fontFamily: "'DM Mono',monospace", fontWeight: 700, color: COHORT_COLORS[code],
-                  }}>
-                    {d !== null ? `${d}d` : `>${c.curve.length - 1}d`}
-                  </span>
-                </span>
-              );
-            })}
+            <div>
+              <div style={{ fontSize: s(12), fontWeight: 600, color: theme.textMuted, marginBottom: 6 }}>
+                Days to 50% cleared:
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {COHORT_ORDER.map(code => {
+                  const c = cohorts[code];
+                  if (!c) return null;
+                  const d = c.daysTo50;
+                  return (
+                    <span key={code} style={{
+                      display: "flex", alignItems: "center", gap: 5,
+                      fontSize: s(12), fontWeight: 500, padding: "3px 10px", borderRadius: 6,
+                      color: theme.text, background: `${COHORT_COLORS[code]}12`,
+                      border: `1px solid ${COHORT_COLORS[code]}30`,
+                    }}>
+                      <span style={{
+                        width: 7, height: 7, borderRadius: "50%", background: COHORT_COLORS[code],
+                        flexShrink: 0,
+                      }} />
+                      {(YEAR_LABELS[code] || code)}:
+                      <span style={{
+                        fontFamily: "'DM Mono',monospace", fontWeight: 700, color: COHORT_COLORS[code],
+                      }}>
+                        {d !== null ? `${d}d` : `>${c.curve.length - 1}d`}
+                      </span>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* Row 2: Days to 75% cleared */}
-            <span style={{ fontSize: s(12), fontWeight: 600, color: theme.textMuted }}>
-              Days to 75% cleared:
-            </span>
-            {COHORT_ORDER.map(code => {
-              const c = cohorts[code];
-              if (!c) return <span key={code} />;
-              const d = c.daysTo25;
-              return (
-                <span key={code} style={{
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                  fontSize: s(12), fontWeight: 500, padding: "3px 8px", borderRadius: 6,
-                  color: theme.text, background: `${COHORT_COLORS[code]}08`,
-                  border: `1px solid ${COHORT_COLORS[code]}20`, textAlign: "center",
-                }}>
-                  <span style={{
-                    width: 7, height: 7, borderRadius: "50%", background: COHORT_COLORS[code],
-                    flexShrink: 0,
-                  }} />
-                  {(YEAR_LABELS[code] || code)}:
-                  <span style={{
-                    fontFamily: "'DM Mono',monospace", fontWeight: 700, color: COHORT_COLORS[code],
-                  }}>
-                    {d !== null ? `${d}d` : `>${c.curve.length - 1}d`}
-                  </span>
-                </span>
-              );
-            })}
+            <div>
+              <div style={{ fontSize: s(12), fontWeight: 600, color: theme.textMuted, marginBottom: 6 }}>
+                Days to 75% cleared:
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {COHORT_ORDER.map(code => {
+                  const c = cohorts[code];
+                  if (!c) return null;
+                  const d = c.daysTo25;
+                  return (
+                    <span key={code} style={{
+                      display: "flex", alignItems: "center", gap: 5,
+                      fontSize: s(12), fontWeight: 500, padding: "3px 10px", borderRadius: 6,
+                      color: theme.text, background: `${COHORT_COLORS[code]}08`,
+                      border: `1px solid ${COHORT_COLORS[code]}20`,
+                    }}>
+                      <span style={{
+                        width: 7, height: 7, borderRadius: "50%", background: COHORT_COLORS[code],
+                        flexShrink: 0,
+                      }} />
+                      {(YEAR_LABELS[code] || code)}:
+                      <span style={{
+                        fontFamily: "'DM Mono',monospace", fontWeight: 700, color: COHORT_COLORS[code],
+                      }}>
+                        {d !== null ? `${d}d` : `>${c.curve.length - 1}d`}
+                      </span>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
 
